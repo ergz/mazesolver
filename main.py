@@ -1,4 +1,5 @@
 from tkinter import Tk, BOTH, Canvas
+import time
 
 
 class Point:
@@ -31,28 +32,38 @@ class Cell:
 
     """
 
-    def __init__(self, walls, _x1, _y1, _x2, _y2, _win, fill_color="black"):
+    def __init__(
+        self,
+        walls,
+        _x1,
+        _y1,
+        _x2,
+        _y2,
+        _win,
+        wall_color="black",
+        empty_wall_color="#f0f0f0",
+    ):
         self.walls = walls
         self._x1 = _x1
         self._y1 = _y1
         self._x2 = _x2
         self._y2 = _y2
         self._win = _win
-        self.fill_color = fill_color
+        self.wall_color = wall_color
+        self.empty_wall_color = empty_wall_color
 
     def draw(self):
-        if self.walls[0]:
-            line = Line(Point(self._x1, self._y1), Point(self._x1, self._y2))
-            self._win.draw_line(line, fill_color=self.fill_color)
-        if self.walls[1]:
-            line = Line(Point(self._x2, self._y1), Point(self._x2, self._y2))
-            self._win.draw_line(line, fill_color=self.fill_color)
-        if self.walls[2]:
-            line = Line(Point(self._x1, self._y2), Point(self._x2, self._y2))
-            self._win.draw_line(line, fill_color=self.fill_color)
-        if self.walls[3]:
-            line = Line(Point(self._x1, self._y1), Point(self._x2, self._y1))
-            self._win.draw_line(line, fill_color=self.fill_color)
+        cell_walls = [
+            Line(Point(self._x1, self._y1), Point(self._x1, self._y2)),
+            Line(Point(self._x2, self._y1), Point(self._x2, self._y2)),
+            Line(Point(self._x1, self._y1), Point(self._x2, self._y1)),
+            Line(Point(self._x1, self._y2), Point(self._x2, self._y2)),
+        ]
+        for i in range(len(self.walls)):
+            self._win.draw_line(
+                cell_walls[i],
+                fill_color=self.wall_color if self.walls[i] else self.empty_wall_color,
+            )
 
     def draw_move(self, to_cell, undo=False):
         origin_cell_center = Point(
@@ -108,22 +119,38 @@ class Maze:
         self.win = win
 
         self._create_cells()
+        self._break_entrance_and_exit()
 
     def _create_cells(self):
         all_cells = []
         walls = (1, 1, 1, 1)
         for col in range(self.num_cols):
+            cell_col = []
             for row in range(self.num_rows):
                 px1 = self.x1 + (row * self.cell_size_x)
                 py1 = self.y1 + (col * self.cell_size_y)
                 px2 = px1 + self.cell_size_x
                 py2 = py1 + self.cell_size_y
                 cell = Cell(walls, px1, py1, px2, py2, self.win)
-                all_cells.append(cell)
+                cell_col.append(cell)
+            all_cells.extend([cell_col])
         self._cells = all_cells
 
-        for i in range(len(self._cells)):
-            self._cells[i].draw()
+        for i in range(self.num_cols):
+            for j in range(self.num_rows):
+                self._cells[i][j].draw()
+
+    def _animate(self):
+        self.win.redraw()
+        time.sleep(0.05)
+
+    def _break_entrance_and_exit(self):
+        top_left_cell = self._cells[0][0]
+        bottom_right_cell = self._cells[self.num_cols - 1][self.num_rows - 1]
+        top_left_cell.walls = (1, 1, 0, 1)
+        bottom_right_cell.walls = (1, 1, 1, 0)
+        top_left_cell.draw()
+        bottom_right_cell.draw()
 
 
 def main():
