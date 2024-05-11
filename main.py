@@ -1,5 +1,6 @@
 from tkinter import Tk, BOTH, Canvas
 import time
+import random
 
 
 class Point:
@@ -40,6 +41,7 @@ class Cell:
         _x2,
         _y2,
         _win,
+        _visited=False,
         wall_color="black",
         empty_wall_color="#f0f0f0",
     ):
@@ -49,6 +51,7 @@ class Cell:
         self._x2 = _x2
         self._y2 = _y2
         self._win = _win
+        self._visited = _visited
         self.wall_color = wall_color
         self.empty_wall_color = empty_wall_color
 
@@ -120,6 +123,7 @@ class Maze:
 
         self._create_cells()
         self._break_entrance_and_exit()
+        self._break_walls_r(0, 0)
 
     def _create_cells(self):
         all_cells = []
@@ -151,6 +155,30 @@ class Maze:
         bottom_right_cell.walls = (1, 1, 1, 0)
         top_left_cell.draw()
         bottom_right_cell.draw()
+
+    def _break_walls_r(self, i, j):
+        current_cell = self._cells[i][j]
+        current_cell._visited = True
+        while True:
+            possible_next_location_ltrb = [
+                (i - 1, j),
+                (i, j - 1),
+                (i + 1, j),
+                (i, j + 1),
+            ]
+
+            possible_locations_not_visited = [
+                (i, j)
+                for (i, j) in possible_next_location_ltrb
+                if not self._cells[i][j]._visited
+            ]
+
+            if len(possible_locations_not_visited) == 0:
+                break
+
+            random_index = random.randint(0, len(possible_locations_not_visited) - 1)
+            next_location = possible_locations_not_visited[random_index]
+            self._break_walls_r(next_location[0], next_location[1])
 
 
 def main():
