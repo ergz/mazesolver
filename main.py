@@ -73,15 +73,34 @@ class Cell:
             self._x1 + ((self._x2 - self._x1) / 2),
             self._y1 + ((self._y2 - self._y1) / 2),
         )
-        print(f"the origin cell: {origin_cell_center}")
         to_cell_center = Point(
             to_cell._x1 + ((to_cell._x2 - to_cell._x1) / 2),
             to_cell._y1 + ((to_cell._y2 - to_cell._y1) / 2),
         )
-        print(f"to cell: {to_cell_center}")
         line = Line(origin_cell_center, to_cell_center)
         fill_color = "grey" if undo else "red"
         self._win.draw_line(line, fill_color=fill_color)
+
+    def break_wall_to(self, to_cell):
+        # need to determine the wall that is shared between these two cells
+        current_vertices = [
+            (self._x1, self._y1),
+            (self._x2, self._y1),
+            (self._x2, self._y2),
+            (self._x1, self._y2),
+        ]
+        next_vertices = [
+            (to_cell._x1, to_cell._y1),
+            (to_cell._x2, to_cell._y1),
+            (to_cell._x2, to_cell._y2),
+            (to_cell._x1, to_cell._y2),
+        ]
+
+        for v1 in current_vertices:
+            for v2 in next_vertices:
+                if v1 == v2:
+                    line = Line(Point(v1[0], v1[1]), Point(v2[0], v2[1]))
+                    line.draw(fill_color="white")
 
 
 class Window:
@@ -159,18 +178,25 @@ class Maze:
     def _break_walls_r(self, i, j):
         current_cell = self._cells[i][j]
         current_cell._visited = True
+        moves = [(-1, 0), (0, -1), (1, 0), (0, 1)]
+
         while True:
-            possible_next_location_ltrb = [
-                (i - 1, j),
-                (i, j - 1),
-                (i + 1, j),
-                (i, j + 1),
-            ]
+            to_visit = []
+            for m in range(len(moves)):
+                possible_position_i = i + moves[m][0]
+                possible_position_j = j + moves[m][1]
+
+                if possible_position_i < 0 or possible_position_i > (self.num_cols - 1):
+                    continue
+                elif possible_position_j < 0 or possible_position_j > (
+                    self.num_rows - 1
+                ):
+                    continue
+                else:
+                    to_visit.append((possible_position_i, possible_position_j))
 
             possible_locations_not_visited = [
-                (i, j)
-                for (i, j) in possible_next_location_ltrb
-                if not self._cells[i][j]._visited
+                (i, j) for (i, j) in to_visit if not self._cells[i][j]._visited
             ]
 
             if len(possible_locations_not_visited) == 0:
@@ -178,6 +204,36 @@ class Maze:
 
             random_index = random.randint(0, len(possible_locations_not_visited) - 1)
             next_location = possible_locations_not_visited[random_index]
+
+            current_cell = self._cells[i][j]
+            next_cell = self._cells[next_location[0]][next_location[1]]
+            current_vertices = [
+                (current_cell._x1, current_cell._y1),
+                (current_cell._x2, current_cell._y1),
+                (current_cell._x2, current_cell._y2),
+                (current_cell._x1, current_cell._y2),
+            ]
+            next_vertices = [
+                (next_cell._x1, next_cell._y1),
+                (next_cell._x2, next_cell._y1),
+                (next_cell._x2, next_cell._y2),
+                (next_cell._x1, next_cell._y2),
+            ]
+
+            break_outer = False
+            for i in range(len(current_vertices)):
+                for j in range(len(next_vertices)):
+                    if current_vertices[i] == next_vertices[j]:
+                        new_walls = [1, 1, 1, 1]
+                        new_walls[i] = 0
+                        new_walls = tuple(new_walls)
+                        current_cell.walls = new_walls
+                        current_cell.draw()
+                        break_outer = True
+                        break
+                if break_outer:
+                    break
+
             self._break_walls_r(next_location[0], next_location[1])
 
 
