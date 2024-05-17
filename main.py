@@ -50,7 +50,7 @@ class Cell:
         _win,
         _visited=False,
         active_wall_color="black",
-        inactive_wall_color="white",
+        inactive_wall_color="#f0f0f0",
     ):
         self.walls = walls
         self._x1 = _x1
@@ -143,6 +143,8 @@ class Maze:
         self._create_cells()
         self._break_entrance_and_exit()
         self._break_walls_r(0, 0)
+        self._reset_cells_visited()
+        self.solve()
 
     def _create_cells(self):
         all_cells = []
@@ -231,6 +233,83 @@ class Maze:
 
             self._break_walls_r(next_location[0], next_location[1])
 
+    def _reset_cells_visited(self):
+        for i in range(self.num_cols):
+            for j in range(self.num_rows):
+                self._cells[i][j]._visited = False
+
+    def solve(self):
+        solution_found = self._solve_r(0, 0)
+        if solution_found:
+            print("Solution found!")
+            return True
+        else:
+            print("soltuion not found")
+            return False
+
+    def _solve_r(self, i, j):
+        self._animate()
+        current_cell = self._cells[i][j]
+        current_cell._visited = True
+
+        # check the puzzle has been solved and return true
+        if i == self.num_cols - 1 and j == self.num_rows - 1:
+            return True
+
+        to_visit = []
+        # left - can we visit the left cell
+        if (
+            i > 0  # check in bounds
+            and not self._cells[i - 1][j]._visited  # check it has not been visited
+            and not self._cells[i - 1][j].walls["right"]  # check there is no wall
+        ):
+            next_cell = self._cells[i - 1][j]
+            current_cell.draw_move(next_cell)
+            solved = self._solve_r(i - 1, j)
+            if not solved:
+                current_cell.draw_move(next_cell, undo=True)
+            else:
+                return True
+        # right - can we visit the right cell
+        if (
+            i < self.num_cols - 1
+            and not self._cells[i + 1][j]._visited
+            and not self._cells[i + 1][j].walls["left"]
+        ):
+            next_cell = self._cells[i + 1][j]
+            current_cell.draw_move(next_cell)
+            solved = self._solve_r(i + 1, j)
+            if not solved:
+                current_cell.draw_move(next_cell, undo=True)
+            else:
+                return True
+        # top
+        if (
+            j > 0  # check in bounds
+            and not self._cells[i][j - 1]._visited  # check it has not been visited
+            and not self._cells[i][j - 1].walls["bottom"]  # check there is no wall
+        ):
+            next_cell = self._cells[i][j - 1]
+            current_cell.draw_move(next_cell)
+            solved = self._solve_r(i, j - 1)
+            if not solved:
+                current_cell.draw_move(next_cell, undo=True)
+            else:
+                return True
+        if (
+            j < self.num_rows - 1
+            and not self._cells[i][j + 1]._visited
+            and not self._cells[i][j + 1].walls["top"]
+        ):
+            next_cell = self._cells[i][j + 1]
+            current_cell.draw_move(next_cell)
+            solved = self._solve_r(i, j + 1)
+            if not solved:
+                current_cell.draw_move(next_cell, undo=True)
+            else:
+                return True
+        return False
+
 
 def main():
     if len(sys.argv) == 1:
@@ -239,7 +318,7 @@ def main():
     else:
         rows = int(sys.argv[1])
         cols = int(sys.argv[2])
-    win = Window(800, 600)
+    win = Window(1200, 1200)
     Maze(10, 10, rows, cols, 50, 50, win)
     win.wait_for_close()
 
