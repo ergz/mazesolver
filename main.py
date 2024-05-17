@@ -2,6 +2,7 @@ from tkinter import Tk, BOTH, Canvas
 import sys
 import time
 import random
+from typing import Dict, List
 
 
 class Point:
@@ -41,15 +42,15 @@ class Cell:
 
     def __init__(
         self,
-        walls,
+        walls: Dict[str, bool],
         _x1,
         _y1,
         _x2,
         _y2,
         _win,
         _visited=False,
-        wall_color="black",
-        empty_wall_color="#f0f0f0",
+        active_wall_color="black",
+        inactive_wall_color="white",
     ):
         self.walls = walls
         self._x1 = _x1
@@ -58,8 +59,8 @@ class Cell:
         self._y2 = _y2
         self._win = _win
         self._visited = _visited
-        self.wall_color = wall_color
-        self.empty_wall_color = empty_wall_color
+        self.active_wall_color = active_wall_color
+        self.inactive_wall_color = inactive_wall_color
         self._walls = {
             "left": Line(Point(self._x1, self._y1), Point(self._x1, self._y2)),
             "right": Line(Point(self._x2, self._y1), Point(self._x2, self._y2)),
@@ -71,11 +72,12 @@ class Cell:
         return f"<Cell: wall: {self.walls} p1: ({self._x1}, {self._y1}) p2: ({self._x2}, {self._y2})"
 
     def draw(self):
-        wall_lines = list(self._walls.values())
-        for i in range(len(self.walls)):
+        for direction, has_wall in self.walls.items():
             self._win.draw_line(
-                wall_lines[i],
-                fill_color=self.wall_color if self.walls[i] else self.empty_wall_color,
+                self._walls[direction],
+                fill_color=self.active_wall_color
+                if has_wall
+                else self.inactive_wall_color,
             )
 
     def draw_move(self, to_cell, undo=False):
@@ -90,14 +92,6 @@ class Cell:
         line = Line(origin_cell_center, to_cell_center)
         fill_color = "grey" if undo else "red"
         self._win.draw_line(line, fill_color=fill_color)
-
-    def get_wall_to_break(self, target):
-        for w_dir, w in self._walls.items():
-            for v_dir, v in target._walls.items():
-                if w.p1 == v.p1 and w.p2 == v.p2:
-                    print(f"(get_cell_to_break): {w.p1} == {v.p1} and {w.p2} == {v.p2}")
-                    print(f"(get_cell_to_break): Corresponds to wall: {w_dir}")
-                    return w_dir
 
 
 class Window:
@@ -152,7 +146,6 @@ class Maze:
 
     def _create_cells(self):
         all_cells = []
-        walls = [1, 1, 1, 1]
         for col in range(self.num_cols):
             cell_col = []
             for row in range(self.num_rows):
@@ -160,7 +153,14 @@ class Maze:
                 py1 = self.y1 + (row * self.cell_size_y)
                 px2 = px1 + self.cell_size_x
                 py2 = py1 + self.cell_size_y
-                cell = Cell(walls, px1, py1, px2, py2, self.win)
+                cell = Cell(
+                    {"right": True, "left": True, "top": True, "bottom": True},
+                    px1,
+                    py1,
+                    px2,
+                    py2,
+                    self.win,
+                )
                 cell_col.append(cell)
             all_cells.append(cell_col)
 
@@ -175,65 +175,61 @@ class Maze:
         time.sleep(0.05)
 
     def _break_entrance_and_exit(self):
-        top_left_cell = self._cells[0][0]
-        bottom_right_cell = self._cells[self.num_cols - 1][self.num_rows - 1]
-        top_left_cell.walls = [1, 1, 0, 1]
-        bottom_right_cell.walls = [1, 1, 1, 0]
-        top_left_cell.draw()
-        bottom_right_cell.draw()
+        entrance_cell = self._cells[0][0]
+        exit_cell = self._cells[self.num_cols - 1][self.num_rows - 1]
+        entrance_cell.walls["top"] = False
+        exit_cell.walls["bottom"] = False
+        entrance_cell.draw()
+        exit_cell.draw()
 
     def _break_walls_r(self, i, j):
         current_cell = self._cells[i][j]
-        print("-----------------------------")
-        print(f"at location: {i},{j}")
         current_cell._visited = True
-        # moves: left (-1, 0), up (0, -1), right (1, 0), down (0, 1)
-        moves = [(-1, 0), (0, -1), (1, 0), (0, 1)]
 
         while True:
             to_visit = []
-            for move in moves:
-                possible_position_i = i + move[0]
-                possible_position_j = j + move[1]
+            # left
+            if i > 0 and not self._cells[i - 1][j]._visited:
+                to_visit.append((i - 1, j))
+            # right
+            if i < self.num_cols - 1 and not self._cells[i + 1][j]._visited:
+                to_visit.append((i + 1, j))
+            # up
+            if j > 0 and not self._cells[i][j - 1]._visited:
+                to_visit.append((i, j - 1))
+            # down
+            if j < self.num_rows - 1 and not self._cells[i][j + 1]._visited:
+                to_visit.append((i, j + 1))
 
-                # Ensure the possible positions are within the bounds of the grid
-                if (
-                    0 <= possible_position_i < self.num_cols
-                    and 0 <= possible_position_j < self.num_rows
-                ):
-                    to_visit.append((possible_position_i, possible_position_j))
-
-            possible_locations_not_visited = list(
-                filter(lambda pos: not self._cells[pos[0]][pos[1]]._visited, to_visit)
-            )
-            print(f"possible locations: {possible_locations_not_visited}")
-
-            # If there are no unvisited adjacent cells, backtrack
-            if len(possible_locations_not_visited) == 0:
-                print("the length of possible locations is zero **returning**")
-                current_cell.draw()
+            if len(to_visit) == 0:
+                self._cells[i][j].draw()
                 return
 
-            # Randomly choose the next cell to visit
-            next_location = random.choice(possible_locations_not_visited)
-            print(f"Next Cell: {self._cells[next_location[0]][next_location[1]]}")
+            next_location = random.choice(to_visit)
 
             next_cell = self._cells[next_location[0]][next_location[1]]
-            wall_to_break = current_cell.get_wall_to_break(next_cell)
-            directions = ["left", "right", "top", "bottom"]
-            idx = directions.index(wall_to_break)
-            current_cell.walls[idx] = 0
-            current_cell.draw()
+
+            # break the call between the current cell and next cell
+            # note that in order to do this correctly we will have to erase the
+            # wall for both the current and the next cell
+            # right
+            if next_location[0] == i + 1:
+                current_cell.walls["right"] = False
+                next_cell.walls["left"] = False
+            # left
+            if next_location[0] == i - 1:
+                current_cell.walls["left"] = False
+                next_cell.walls["right"] = False
+            # up
+            if next_location[1] == j - 1:
+                current_cell.walls["top"] = False
+                next_cell.walls["bottom"] = False
+            # down
+            if next_location[1] == j + 1:
+                current_cell.walls["bottom"] = False
+                next_cell.walls["top"] = False
 
             self._break_walls_r(next_location[0], next_location[1])
-
-            # Check if the next location is the end of the maze
-            if (
-                next_location[0] == self.num_cols - 1
-                and next_location[1] == self.num_rows - 1
-            ):
-                print("reached the end of the puzzle, returning")
-                return
 
 
 def main():
